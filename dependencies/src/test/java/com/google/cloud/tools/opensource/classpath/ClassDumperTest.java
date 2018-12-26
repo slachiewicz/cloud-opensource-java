@@ -16,14 +16,20 @@
 
 package com.google.cloud.tools.opensource.classpath;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
+
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.reflect.ClassPath.ClassInfo;
 import com.google.common.truth.Correspondence;
 import com.google.common.truth.Truth;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Set;
 import org.apache.bcel.classfile.ClassParser;
@@ -34,6 +40,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class ClassDumperTest {
+
   private static final String EXAMPLE_JAR_FILE =
       "testdata/grpc-google-cloud-firestore-v1beta1-0.28.0.jar";
 
@@ -197,5 +204,54 @@ public class ClassDumperTest {
     Truth.assertThat(actualName).isEqualTo("com.google.Foo$Bar");
     String topLevelClass = ClassDumper.enclosingClassName("com.google.Foo");
     Truth.assertThat(topLevelClass).isNull();
+  }
+
+  @Test
+  public void testGuavaTopLevelClass() throws Exception {
+    // google-cloud-bigquery-1.56.0.jar contains com.google.cloud.bigquery.$AutoValue_Labels
+    URL jarFileUrl =
+        new URL(
+            "file:///usr/local/google/home/suztomo/.m2/repository/com/google/cloud/google-cloud-bigquery/1.56.0/google-cloud-bigquery-1.56.0.jar");
+    URL[] jarFileUrls = new URL[] {jarFileUrl};
+
+    // Setting parent as null because we don't want other classes than this jar file
+    URLClassLoader classLoaderFromJar = new URLClassLoader(jarFileUrls, null);
+
+    // Leveraging Google Guava reflection as BCEL doesn't list classes in a jar file
+    com.google.common.reflect.ClassPath classPath =
+        com.google.common.reflect.ClassPath.from(classLoaderFromJar);
+
+    ImmutableList<String> allClassNames =
+        classPath.getAllClasses().stream()
+            .map(classInfo -> classInfo.getName())
+            .collect(toImmutableList());
+    // This does not return class com.google.cloud.bigquery.$AutoValue_Labels
+    // Guava only checks the existence of '$'
+    // https://github.com/google/guava/blob/master/guava/src/com/google/common/reflect/ClassPath.java#L85
+    ImmutableList<String> topLevelClassNames =
+        classPath.getTopLevelClasses().stream()
+            .map((ClassInfo classInfo) -> {
+              return classInfo.getName();
+            })
+            .collect(toImmutableList());
+
+    String class$AutoValue_Labels = "com.google.cloud.bigquery.$AutoValue_Labels";
+    System.out.println("In all classes? " + allClassNames.contains(class$AutoValue_Labels)); // true
+    System.out.println(
+        "In top-level classes? " + topLevelClassNames.contains(class$AutoValue_Labels)); // false
+  }
+
+  @Test
+  public void testLoadClassNameWithDollar() throws Exception {
+    Path bigqueryPath =
+        Paths.get(
+            "/usr/local/google/home/suztomo/.m2/repository/com/google/cloud/google-cloud-bigquery/1.56.0/google-cloud-bigquery-1.56.0.jar");
+    // google-cloud-bigquery-1.56.0.jar contains com.google.cloud.bigquery.$AutoValue_Labels
+    ClassDumper classDumper = ClassDumper.create(ImmutableList.of(bigqueryPath));
+    String class$AutoValue_Labels = "com.google.cloud.bigquery.$AutoValue_Labels";
+    JavaClass javaClass = classDumper.loadJavaClass(class$AutoValue_Labels);
+    // BCEL checks the attribute field of class file to determine isNested
+    // https://github.com/apache/commons-bcel/blob/trunk/src/main/java/org/apache/bcel/classfile/JavaClass.java#L717
+    System.out.println("Is this class nested? " + javaClass.isNested()); // false
   }
 }
