@@ -142,7 +142,7 @@ class ClassDumper {
     checkArgument(Files.isReadable(jarFilePath), "The input jar file path is not readable");
 
     SymbolReferenceSet.Builder symbolTableBuilder = SymbolReferenceSet.builder();
-    for (JavaClass javaClass : javaAllClassesInJar(jarFilePath)) {
+    for (JavaClass javaClass : allJavaClassesInJar(jarFilePath)) {
       symbolTableBuilder.addAll(scanSymbolReferencesInClass(javaClass));
     }
     return symbolTableBuilder.build();
@@ -358,7 +358,7 @@ class ClassDumper {
     ImmutableSetMultimap.Builder<Path, String> pathToClasses = ImmutableSetMultimap.builder();
 
     for (Path jarFilePath : jarFilePaths) {
-      for (JavaClass javaClass : javaAllClassesInJar(jarFilePath)) {
+      for (JavaClass javaClass : allJavaClassesInJar(jarFilePath)) {
         pathToClasses.put(jarFilePath, javaClass.getClassName());
         // This does not take double-nested classes. As long as such classes are accessed
         // only from the outer class, static linkage checker does not report false positives
@@ -384,7 +384,7 @@ class ClassDumper {
     return allClassesInJar;
   }
 
-  private static ImmutableSet<JavaClass> javaAllClassesInJar(Path jarFilePath)
+  private static ImmutableSet<JavaClass> allJavaClassesInJar(Path jarFilePath)
       throws IOException {
     String pathToJar = jarFilePath.toString();
     SyntheticRepository repository = SyntheticRepository.getInstance(new ClassPath(pathToJar));

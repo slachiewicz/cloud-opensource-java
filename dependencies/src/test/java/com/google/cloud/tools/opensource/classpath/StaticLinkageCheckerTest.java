@@ -31,6 +31,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import org.apache.commons.cli.CommandLine;
@@ -211,6 +212,25 @@ public class StaticLinkageCheckerTest {
     Truth.assertThat(jarLinkageReport.getMissingMethodErrors()).hasSize(1);
     Assert.assertEquals(
         arrayInvalidMethod, jarLinkageReport.getMissingMethodErrors().get(0).getReference());
+  }
+
+  @Test
+  public void testFindMethodReferences_methodsOnInterface()
+      throws IOException, URISyntaxException {
+    List<Path> paths = ImmutableList.of(absolutePathOfResource("testdata/guava-26.0-jre.jar"));
+    StaticLinkageChecker staticLinkageChecker =
+        StaticLinkageChecker.create(false, paths, ImmutableSet.copyOf(paths));
+    MethodSymbolReference methodOnInterface =
+        MethodSymbolReference.builder()
+            .setSourceClassName(StaticLinkageCheckReportTest.class.getName())
+            .setTargetClassName("javax.net.ssl.X509ExtendedKeyManager")
+            .setMethodName("getClientAliases")
+            .setDescriptor("(Ljava/lang/String;[Ljava/security/Principal;)[Ljava/lang/String;")
+            .build();
+
+    Optional<StaticLinkageError<MethodSymbolReference>> detectedError = staticLinkageChecker
+        .checkLinkageErrorMissingMethodAt(methodOnInterface);
+    Truth.assertThat(detectedError.isPresent()).isFalse();
   }
 
   @Test

@@ -34,6 +34,7 @@ import java.nio.file.Paths;
 import java.util.Set;
 import org.apache.bcel.classfile.ClassParser;
 import org.apache.bcel.classfile.JavaClass;
+import org.conscrypt.Conscrypt;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -253,5 +254,11 @@ public class ClassDumperTest {
     // BCEL checks the attribute field of class file to determine isNested
     // https://github.com/apache/commons-bcel/blob/trunk/src/main/java/org/apache/bcel/classfile/JavaClass.java#L717
     System.out.println("Is this class nested? " + javaClass.isNested()); // false
+  }
+
+  @Test
+  public void testConscriptCreation() {
+    int packetLength = Conscrypt.maxEncryptedPacketLength();
+    System.out.println("packetLength : " + packetLength);
   }
 }

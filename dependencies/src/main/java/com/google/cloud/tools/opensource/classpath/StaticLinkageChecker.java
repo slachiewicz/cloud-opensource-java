@@ -31,6 +31,7 @@ import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.graph.Traverser;
 import java.io.IOException;
+import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Array;
 import java.net.URL;
 import java.nio.file.Path;
@@ -260,7 +261,8 @@ public class StaticLinkageChecker {
    * reference does not have a valid referent in the input class path; otherwise an empty {@code
    * Optional}.
    */
-  private Optional<StaticLinkageError<MethodSymbolReference>> checkLinkageErrorMissingMethodAt(
+  @VisibleForTesting
+  Optional<StaticLinkageError<MethodSymbolReference>> checkLinkageErrorMissingMethodAt(
       MethodSymbolReference reference) {
     if (validateMethodReference(reference)) {
       return Optional.empty();
@@ -370,7 +372,20 @@ public class StaticLinkageChecker {
         // https://docs.oracle.com/javase/8/docs/api/java/lang/Class.html#getMethod-java.lang.String-java.lang.Class...-
         return true;
       } else {
-        clazz.getMethod(methodName, parameterTypes);
+        try {
+          clazz.getMethod(methodName, parameterTypes);
+        } catch (NoSuchMethodException e) {
+          for (AnnotatedType interfaceType : clazz.getAnnotatedInterfaces()) {
+            String interfaceTypeName = interfaceType.getType().getTypeName();
+            MethodSymbolReference interfaceMethodReference =
+                methodReference.toBuilder().setTargetClassName(interfaceTypeName).build();
+            boolean interfaceResult = validateMethodReference(interfaceMethodReference);
+            if (interfaceResult) {
+              return true;
+            }
+          }
+          return false;
+        }
       }
       return true;
     } catch (NoSuchMethodException | ClassNotFoundException ex) {
